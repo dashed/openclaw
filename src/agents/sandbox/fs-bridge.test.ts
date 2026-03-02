@@ -13,15 +13,20 @@ import { createSandboxTestContext } from "./test-fixtures.js";
 import type { SandboxContext } from "./types.js";
 
 const mockedExecDockerRaw = vi.mocked(execDockerRaw);
-const DOCKER_SCRIPT_INDEX = 5;
-const DOCKER_FIRST_SCRIPT_ARG_INDEX = 7;
+function getDockerScriptIndex(args: string[]): number {
+  const cIdx = args.indexOf("-c");
+  return cIdx >= 0 ? cIdx + 1 : -1;
+}
 
 function getDockerScript(args: string[]): string {
-  return String(args[DOCKER_SCRIPT_INDEX] ?? "");
+  const idx = getDockerScriptIndex(args);
+  return idx >= 0 ? String(args[idx] ?? "") : "";
 }
 
 function getDockerArg(args: string[], position: number): string {
-  return String(args[DOCKER_FIRST_SCRIPT_ARG_INDEX + position - 1] ?? "");
+  const idx = getDockerScriptIndex(args);
+  // idx = script, idx+1 = argv[0] ("moltbot-sandbox-fs"), actual args start at idx+2
+  return idx >= 0 ? String(args[idx + 1 + position] ?? "") : "";
 }
 
 function getDockerPathArg(args: string[]): string {
@@ -112,7 +117,10 @@ describe("sandbox fs bridge shell compatibility", () => {
     expect(mockedExecDockerRaw).toHaveBeenCalled();
 
     const scripts = getScriptsFromCalls();
-    const executables = mockedExecDockerRaw.mock.calls.map(([args]) => args[3] ?? "");
+    const executables = mockedExecDockerRaw.mock.calls.map(([args]) => {
+      const cIdx = args.indexOf("-c");
+      return cIdx >= 0 ? (args[cIdx - 1] ?? "") : "";
+    });
 
     expect(executables.every((shell) => shell === "sh")).toBe(true);
     expect(scripts.every((script) => /set -eu[;\n]/.test(script))).toBe(true);
@@ -154,6 +162,29 @@ describe("sandbox fs bridge shell compatibility", () => {
     expect(readCall).toBeDefined();
     const readPath = readCall ? getDockerPathArg(readCall[0]) : "";
     expect(readPath).toBe("/workspace/--leading.txt");
+  });
+
+  it("passes -u flag to docker exec when docker.user is set", async () => {
+    const bridge = createSandboxFsBridge({ sandbox: createSandbox() });
+
+    await bridge.readFile({ filePath: "a.txt" });
+
+    const args = mockedExecDockerRaw.mock.calls[0]?.[0] ?? [];
+    const uIdx = args.indexOf("-u");
+    expect(uIdx).toBeGreaterThan(0);
+    expect(args[uIdx + 1]).toBe("1000:1000");
+  });
+
+  it("omits -u flag when docker.user is not set", async () => {
+    const sandbox = createSandbox({
+      docker: { ...createSandbox().docker, user: undefined },
+    });
+    const bridge = createSandboxFsBridge({ sandbox });
+
+    await bridge.readFile({ filePath: "a.txt" });
+
+    const args = mockedExecDockerRaw.mock.calls[0]?.[0] ?? [];
+    expect(args).not.toContain("-u");
   });
 
   it("resolves bind-mounted absolute container paths for reads", async () => {
