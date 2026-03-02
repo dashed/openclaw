@@ -391,6 +391,7 @@ export async function runExecProcess(opts: {
             workdir: opts.containerWorkdir ?? opts.sandbox.containerWorkdir,
             env: shellRuntimeEnv,
             tty: opts.usePty,
+            user: opts.sandbox.user,
           }),
         ],
         env: process.env,
