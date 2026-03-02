@@ -404,7 +404,7 @@ describe("isPrivateOrLoopbackHost", () => {
 });
 
 describe("isSecureWebSocketUrl", () => {
-  it("accepts secure websocket/loopback/private ws URLs and rejects unsafe inputs", () => {
+  it("defaults to loopback-only ws:// and rejects private/public remote ws://", () => {
     const cases = [
       // wss:// always accepted
       { input: "wss://127.0.0.1:18789", expected: true },
@@ -416,23 +416,20 @@ describe("isSecureWebSocketUrl", () => {
       { input: "ws://localhost:18789", expected: true },
       { input: "ws://[::1]:18789", expected: true },
       { input: "ws://127.0.0.42:18789", expected: true },
-      // ws:// RFC 1918 private addresses accepted
-      { input: "ws://10.0.0.5:18789", expected: true },
-      { input: "ws://10.42.1.100:18789", expected: true },
-      { input: "ws://172.16.0.1:18789", expected: true },
-      { input: "ws://172.31.255.254:18789", expected: true },
-      { input: "ws://192.168.1.100:18789", expected: true },
-      // ws:// CGNAT and link-local accepted
-      { input: "ws://169.254.10.20:18789", expected: true },
-      { input: "ws://100.64.0.1:18789", expected: true },
-      // ws:// IPv6 private accepted
-      { input: "ws://[fc00::1]:18789", expected: true },
-      { input: "ws://[fd12:3456:789a::1]:18789", expected: true },
-      { input: "ws://[fe80::1]:18789", expected: true },
-      // ws:// unspecified/multicast IPv6 rejected (not unicast endpoints)
+      // ws:// private/public remote addresses rejected by default
+      { input: "ws://10.0.0.5:18789", expected: false },
+      { input: "ws://10.42.1.100:18789", expected: false },
+      { input: "ws://172.16.0.1:18789", expected: false },
+      { input: "ws://172.31.255.254:18789", expected: false },
+      { input: "ws://192.168.1.100:18789", expected: false },
+      { input: "ws://169.254.10.20:18789", expected: false },
+      { input: "ws://100.64.0.1:18789", expected: false },
+      { input: "ws://[fc00::1]:18789", expected: false },
+      { input: "ws://[fd12:3456:789a::1]:18789", expected: false },
+      { input: "ws://[fe80::1]:18789", expected: false },
       { input: "ws://[::]:18789", expected: false },
       { input: "ws://[ff02::1]:18789", expected: false },
-      // ws:// public addresses rejected (CWE-319)
+      // ws:// public addresses rejected
       { input: "ws://remote.example.com:18789", expected: false },
       { input: "ws://1.1.1.1:18789", expected: false },
       { input: "ws://8.8.8.8:18789", expected: false },
@@ -446,6 +443,22 @@ describe("isSecureWebSocketUrl", () => {
 
     for (const testCase of cases) {
       expect(isSecureWebSocketUrl(testCase.input), testCase.input).toBe(testCase.expected);
+    }
+  });
+
+  it("allows private ws:// only when opt-in is enabled", () => {
+    const allowedWhenOptedIn = [
+      "ws://10.0.0.5:18789",
+      "ws://172.16.0.1:18789",
+      "ws://192.168.1.100:18789",
+      "ws://100.64.0.1:18789",
+      "ws://169.254.10.20:18789",
+      "ws://[fc00::1]:18789",
+      "ws://[fe80::1]:18789",
+    ];
+
+    for (const input of allowedWhenOptedIn) {
+      expect(isSecureWebSocketUrl(input, { allowPrivateWs: true }), input).toBe(true);
     }
   });
 });
