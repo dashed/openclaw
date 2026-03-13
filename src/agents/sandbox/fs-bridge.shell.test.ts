@@ -37,7 +37,10 @@ describe("sandbox fs bridge shell compatibility", () => {
       expect(mockedExecDockerRaw).toHaveBeenCalled();
 
       const scripts = getScriptsFromCalls();
-      const executables = mockedExecDockerRaw.mock.calls.map(([args]) => args[3] ?? "");
+      const executables = mockedExecDockerRaw.mock.calls.map(([args]) => {
+        const cIdx = args.indexOf("-c");
+        return cIdx >= 0 ? (args[cIdx - 1] ?? "") : "";
+      });
 
       expect(executables.every((shell) => shell === "sh")).toBe(true);
       expect(scripts.every((script) => /set -eu[;\n]/.test(script))).toBe(true);
@@ -181,5 +184,42 @@ describe("sandbox fs bridge shell compatibility", () => {
 
     const scripts = getScriptsFromCalls();
     expect(scripts.some((script) => script.includes("os.replace("))).toBe(false);
+  });
+
+  it("passes -u flag to docker exec when docker.user is set", async () => {
+    await withTempDir("openclaw-fs-bridge-user-", async (stateDir) => {
+      const workspaceDir = path.join(stateDir, "workspace");
+      await fs.mkdir(workspaceDir, { recursive: true });
+
+      const bridge = createSandboxFsBridge({
+        sandbox: createSandbox({ workspaceDir, agentWorkspaceDir: workspaceDir }),
+      });
+
+      await bridge.mkdirp({ filePath: "nested" });
+
+      const args = mockedExecDockerRaw.mock.calls[0]?.[0] ?? [];
+      const uIdx = args.indexOf("-u");
+      expect(uIdx).toBeGreaterThan(0);
+      expect(args[uIdx + 1]).toBe("1000:1000");
+    });
+  });
+
+  it("omits -u flag when docker.user is not set", async () => {
+    await withTempDir("openclaw-fs-bridge-user-", async (stateDir) => {
+      const workspaceDir = path.join(stateDir, "workspace");
+      await fs.mkdir(workspaceDir, { recursive: true });
+
+      const sandbox = createSandbox({
+        workspaceDir,
+        agentWorkspaceDir: workspaceDir,
+        docker: { ...createSandbox().docker, user: undefined },
+      });
+      const bridge = createSandboxFsBridge({ sandbox });
+
+      await bridge.mkdirp({ filePath: "nested" });
+
+      const args = mockedExecDockerRaw.mock.calls[0]?.[0] ?? [];
+      expect(args).not.toContain("-u");
+    });
   });
 });

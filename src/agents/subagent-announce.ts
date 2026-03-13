@@ -18,14 +18,12 @@ import { isCronSessionKey } from "../sessions/session-key-utils.js";
 import { extractTextFromChatContent } from "../shared/chat-content.js";
 import {
   type DeliveryContext,
-  deliveryContextFromSession,
   mergeDeliveryContext,
   normalizeDeliveryContext,
 } from "../utils/delivery-context.js";
 import {
   INTERNAL_MESSAGE_CHANNEL,
   isDeliverableMessageChannel,
-  isInternalMessageChannel,
 } from "../utils/message-channel.js";
 import {
   buildAnnounceIdFromChildRun,
@@ -38,6 +36,7 @@ import {
   queueEmbeddedPiMessage,
   waitForEmbeddedPiRunEnd,
 } from "./pi-embedded.js";
+import { resolveAnnounceOrigin } from "./announce-origin.js";
 import {
   runSubagentAnnounceDispatch,
   type SubagentAnnounceDeliveryResult,
@@ -483,43 +482,6 @@ async function buildCompactAnnounceStatsLine(params: {
   return `Stats: ${parts.join(" • ")}`;
 }
 
-type DeliveryContextSource = Parameters<typeof deliveryContextFromSession>[0];
-
-function resolveAnnounceOrigin(
-  entry?: DeliveryContextSource,
-  requesterOrigin?: DeliveryContext,
-): DeliveryContext | undefined {
-  const normalizedRequester = normalizeDeliveryContext(requesterOrigin);
-  const normalizedEntry = deliveryContextFromSession(entry);
-  if (normalizedRequester?.channel && isInternalMessageChannel(normalizedRequester.channel)) {
-    // Ignore internal channel hints (webchat) so a valid persisted route
-    // can still be used for outbound delivery. Non-standard channels that
-    // are not in the deliverable list should NOT be stripped here — doing
-    // so causes the session entry's stale lastChannel (often WhatsApp) to
-    // override the actual requester origin, leading to delivery failures.
-    return mergeDeliveryContext(
-      {
-        accountId: normalizedRequester.accountId,
-        threadId: normalizedRequester.threadId,
-      },
-      normalizedEntry,
-    );
-  }
-  // requesterOrigin (captured at spawn time) reflects the channel the user is
-  // actually on and must take priority over the session entry, which may carry
-  // stale lastChannel / lastTo values from a previous channel interaction.
-  const entryForMerge =
-    normalizedRequester?.to &&
-    normalizedRequester.threadId == null &&
-    normalizedEntry?.threadId != null
-      ? (() => {
-          const { threadId: _ignore, ...rest } = normalizedEntry;
-          return rest;
-        })()
-      : normalizedEntry;
-  return mergeDeliveryContext(normalizedRequester, entryForMerge);
-}
-
 async function resolveSubagentCompletionOrigin(params: {
   childSessionKey: string;
   requesterSessionKey: string;
@@ -626,6 +588,7 @@ async function sendAnnounce(item: AnnounceQueueItem) {
       idempotencyKey,
     },
     timeoutMs: announceTimeoutMs,
+    skipDeviceIdentity: true,
   });
 }
 
@@ -824,6 +787,7 @@ async function sendSubagentAnnounceDirectly(params: {
           },
           expectFinal: true,
           timeoutMs: announceTimeoutMs,
+          skipDeviceIdentity: true,
         }),
     });
 

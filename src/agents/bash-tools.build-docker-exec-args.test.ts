@@ -90,4 +90,56 @@ describe("buildDockerExecArgs", () => {
 
     expect(args).toContain("-t");
   });
+
+  it("inserts -u flag when user is provided", () => {
+    const args = buildDockerExecArgs({
+      containerName: "test-container",
+      command: "echo hello",
+      env: {},
+      tty: false,
+      user: "1000:1000",
+    });
+    const uIndex = args.indexOf("-u");
+    expect(uIndex).toBeGreaterThan(0);
+    expect(args[uIndex + 1]).toBe("1000:1000");
+    const containerIndex = args.indexOf("test-container");
+    expect(uIndex).toBeLessThan(containerIndex);
+  });
+
+  it("does not insert -u flag when user is undefined", () => {
+    const args = buildDockerExecArgs({
+      containerName: "test-container",
+      command: "echo hello",
+      env: {},
+      tty: false,
+      user: undefined,
+    });
+    expect(args).not.toContain("-u");
+  });
+
+  it("does not insert -u flag when user is empty string", () => {
+    const args = buildDockerExecArgs({
+      containerName: "test-container",
+      command: "echo hello",
+      env: {},
+      tty: false,
+      user: "",
+    });
+    expect(args).not.toContain("-u");
+  });
+
+  it("places -u before -t when both user and tty are set", () => {
+    const args = buildDockerExecArgs({
+      containerName: "test-container",
+      command: "echo hello",
+      env: {},
+      tty: true,
+      user: "1000:1000",
+    });
+    const uIndex = args.indexOf("-u");
+    const tIndex = args.indexOf("-t");
+    expect(uIndex).toBeGreaterThan(0);
+    expect(tIndex).toBeGreaterThan(0);
+    expect(uIndex).toBeLessThan(tIndex);
+  });
 });

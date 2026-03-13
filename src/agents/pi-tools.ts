@@ -439,6 +439,7 @@ export function createOpenClawCodingTools(options?: {
           workspaceDir: sandbox.workspaceDir,
           containerWorkdir: sandbox.containerWorkdir,
           env: sandbox.docker.env,
+          user: sandbox.docker.user,
         }
       : undefined,
   });
