@@ -25,15 +25,20 @@ export const createSandboxFsBridge = fsBridgeModule.createSandboxFsBridge;
 
 export const mockedExecDockerRaw = vi.mocked(execDockerRaw);
 export const mockedOpenBoundaryFile = vi.mocked(openBoundaryFile);
-const DOCKER_SCRIPT_INDEX = 5;
-const DOCKER_FIRST_SCRIPT_ARG_INDEX = 7;
+function getDockerScriptIndex(args: string[]): number {
+  const cIdx = args.indexOf("-c");
+  return cIdx >= 0 ? cIdx + 1 : -1;
+}
 
 export function getDockerScript(args: string[]): string {
-  return String(args[DOCKER_SCRIPT_INDEX] ?? "");
+  const idx = getDockerScriptIndex(args);
+  return idx >= 0 ? String(args[idx] ?? "") : "";
 }
 
 export function getDockerArg(args: string[], position: number): string {
-  return String(args[DOCKER_FIRST_SCRIPT_ARG_INDEX + position - 1] ?? "");
+  const idx = getDockerScriptIndex(args);
+  // idx = script, idx+1 = argv[0] ("moltbot-sandbox-fs"), actual args start at idx+2
+  return idx >= 0 ? String(args[idx + 1 + position] ?? "") : "";
 }
 
 export function getDockerPathArg(args: string[]): string {
