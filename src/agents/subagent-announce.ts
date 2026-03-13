@@ -588,6 +588,7 @@ async function sendAnnounce(item: AnnounceQueueItem) {
       idempotencyKey,
     },
     timeoutMs: announceTimeoutMs,
+    skipDeviceIdentity: true,
   });
 }
 
@@ -786,6 +787,7 @@ async function sendSubagentAnnounceDirectly(params: {
           },
           expectFinal: true,
           timeoutMs: announceTimeoutMs,
+          skipDeviceIdentity: true,
         }),
     });
 
