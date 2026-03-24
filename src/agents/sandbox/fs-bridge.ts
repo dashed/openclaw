@@ -262,6 +262,7 @@ class SandboxFsBridgeImpl implements SandboxFsBridge {
     }
     return await runDockerSandboxShellCommand({
       containerName: this.sandbox.containerName,
+      user: this.sandbox.docker.user,
       script,
       args: options.args,
       stdin: options.stdin,
