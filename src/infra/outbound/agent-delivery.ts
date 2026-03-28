@@ -131,7 +131,12 @@ export function resolveAgentDeliveryPlan(params: {
     resolvedChannel,
     resolvedTo,
     resolvedAccountId,
-    resolvedThreadId: baseDelivery.threadId,
+    resolvedThreadId:
+      deliveryTargetMode === "explicit"
+        ? baseDelivery.threadIdExplicit
+          ? baseDelivery.threadId
+          : undefined
+        : baseDelivery.threadId,
     deliveryTargetMode,
   };
 }

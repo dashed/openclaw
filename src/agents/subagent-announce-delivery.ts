@@ -178,16 +178,30 @@ export function resolveAnnounceOrigin(
       normalizedEntry,
     );
   }
-  const entryForMerge =
-    normalizedRequester?.to &&
-    normalizedRequester.threadId == null &&
-    normalizedEntry?.threadId != null
-      ? (() => {
-          const { threadId: _ignore, ...rest } = normalizedEntry;
-          return rest;
-        })()
-      : normalizedEntry;
-  return mergeDeliveryContext(normalizedRequester, entryForMerge);
+  // requesterOrigin (captured at spawn time) reflects the channel the user is
+  // actually on and must take priority over the session entry, which may carry
+  // stale lastChannel / lastTo values from a previous channel interaction.
+  const merged = mergeDeliveryContext(normalizedRequester, normalizedEntry);
+  if (!merged) {
+    return undefined;
+  }
+  // When a requesterOrigin is present, only keep session-derived `threadId`
+  // and `to` if the requester explicitly carried them. Session-stored values
+  // may be stale (e.g. heartbeat overwrites `lastTo` with its own target
+  // channel, causing cron announces to route to the wrong destination).
+  if (normalizedRequester) {
+    const cleanThreadId = normalizedRequester.threadId != null ? merged.threadId : undefined;
+    const cleanTo = normalizedRequester.to != null ? merged.to : undefined;
+    if (cleanThreadId !== merged.threadId || cleanTo !== merged.to) {
+      return normalizeDeliveryContext({
+        channel: merged.channel,
+        to: cleanTo,
+        accountId: merged.accountId,
+        threadId: cleanThreadId,
+      });
+    }
+  }
+  return merged;
 }
 
 export async function resolveSubagentCompletionOrigin(params: {
