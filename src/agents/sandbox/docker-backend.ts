@@ -75,17 +75,14 @@ export function createDockerSandboxBackendHandle(params: {
 export function runDockerSandboxShellCommand(
   params: {
     containerName: string;
+    user?: string;
   } & SandboxBackendCommandParams,
 ) {
-  const dockerArgs = [
-    "exec",
-    "-i",
-    params.containerName,
-    "sh",
-    "-c",
-    params.script,
-    "moltbot-sandbox-fs",
-  ];
+  const dockerArgs = ["exec", "-i"];
+  if (params.user) {
+    dockerArgs.push("-u", params.user);
+  }
+  dockerArgs.push(params.containerName, "sh", "-c", params.script, "moltbot-sandbox-fs");
   if (params.args?.length) {
     dockerArgs.push(...params.args);
   }
